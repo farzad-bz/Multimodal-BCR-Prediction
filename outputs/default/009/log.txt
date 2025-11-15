@@ -1,0 +1,10 @@
+[[34m2025-11-14 22:09:12[0m] Using device: cuda
+[[34m2025-11-14 22:10:29[0m] Uncaught exception:
+Traceback (most recent call last):
+  File "/home-2/ar94660/Multimodal_BCR/train.py", line 51, in <module>
+    main(cfg)
+  File "/home-2/ar94660/Multimodal_BCR/train.py", line 32, in main
+    c_index = train_one_fold(cfg, get_image_encoder(cfg, device), modalities, ld_tr, ld_va, T_va, E_va, device=device)
+  File "/home-2/ar94660/Multimodal_BCR/src/trainer.py", line 93, in train_one_fold
+    c_idx = concordance_index(T_va_np, -risk_va, E_va_np)
+NameError: name 'concordance_index' is not defined

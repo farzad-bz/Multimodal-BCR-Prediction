@@ -1,0 +1,30 @@
+[[34m2025-11-14 22:01:43[0m] Using device: cuda
+[[34m2025-11-14 22:02:56[0m] Uncaught exception:
+Traceback (most recent call last):
+  File "/home-2/ar94660/Multimodal_BCR/train.py", line 51, in <module>
+    main(cfg)
+  File "/home-2/ar94660/Multimodal_BCR/train.py", line 32, in main
+    c_index = train_one_fold(cfg, get_image_encoder(cfg, device), modalities, ld_tr, ld_va, T_va, E_va, device=device)
+  File "/home-2/ar94660/Multimodal_BCR/src/trainer.py", line 30, in train_one_fold
+    t2_emb = M3D_model.encode_image(vol)[:, 0]  # (B, 768)
+  File "/home/ar94660/.cache/huggingface/modules/transformers_modules/GoodBaiBai88/M3D-CLIP/ae091d89a0ef38b533ecc4ed21426f7658853963/modeling_m3d_clip.py", line 185, in encode_image
+    image_feats, _ = self.vision_encoder(image)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ar94660/.cache/huggingface/modules/transformers_modules/GoodBaiBai88/M3D-CLIP/ae091d89a0ef38b533ecc4ed21426f7658853963/modeling_m3d_clip.py", line 146, in forward
+    x = blk(x)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/monai/networks/blocks/transformerblock.py", line 60, in forward
+    x = x + self.attn(self.norm1(x))
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home-2/ar94660/segmentaiton_venv/lib/python3.10/site-packages/monai/networks/blocks/selfattention.py", line 69, in forward
+    att_mat = (torch.einsum("blxd,blyd->blxy", q, k) * self.scale).softmax(dim=-1)
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 6.01 GiB. GPU 0 has a total capacty of 11.77 GiB of which 3.30 GiB is free. Including non-PyTorch memory, this process has 8.46 GiB memory in use. Of the allocated memory 7.94 GiB is allocated by PyTorch, and 156.75 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
