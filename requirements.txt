@@ -1,0 +1,15 @@
+-f https://download.pytorch.org/whl/cu121
+
+torch==2.1.2
+torchvision==0.16.2
+lifelines==0.30.0
+numpy==1.24.1
+omegaconf==2.3.0
+pandas==2.3.2
+scikit-learn==1.7.2
+scikit-survival==0.25.0
+SimpleITK==2.5.2
+torchio==0.20.22
+tqdm==4.67.1
+transformers==4.43.4
+wandb==0.23.0

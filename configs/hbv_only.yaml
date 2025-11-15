@@ -1,0 +1,67 @@
+# =========================
+# Experiment identity
+# =========================
+exp:
+  name: "hbv_only"
+  output_dir: "./outputs/"     # will be created if missing
+  seed: 42
+
+# =========================
+# Data
+# =========================
+data:
+  mpMRI_dir: "./data/preprcoessed_mpMRI/"
+  clinical_df_path: "./data/clinical_data_processed.csv"
+  modalities: #modalities to use for training the model
+    # - clinical
+    # - t2
+    - hbv
+    # - adc
+  features: #features to use from clinical_data
+    - ISUP 
+    - positive_lymph_nodes
+    - lymphovascular_invasion
+    - invasion_seminal_vesicles
+    - positive_lymph_nodes_missing
+    - age_at_prostatectomy
+  num_workers: 4
+  pin_memory: true
+  aug: false
+
+# =========================
+# 3D Medical encoder
+# =========================
+fusion_model:
+  embed_dim: 16
+
+image_encoder:
+  pretrained_path: GoodBaiBai88/M3D-CLIP
+  embed_dim: 768
+
+# =========================
+# Optimization
+# =========================
+optim:
+  lr: 0.0004
+  weight_decay: 0.001
+  scheduler_patience: 10
+  scheduler_factor: 0.5
+  max_grad_norm: 5.0
+
+# =========================
+# Training loop
+# =========================
+train:
+  epochs: 200
+  stop_patience: 20
+  batch_size: 32                     # batch size
+  accum_steps: 1                      # effective batch = batch_size * accum_steps
+
+# =========================
+# Logging
+# =========================
+wandb_logging:
+  enabled: true
+  project: "Multimodal BCR Prediction"
+  run_name: "${exp.name}"
+  mode: "online"                   # "online" or "offline"

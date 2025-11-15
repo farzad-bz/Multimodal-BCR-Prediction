@@ -23,5 +23,4 @@ data/preprcoessed_mpMRI/
 wandb/
 outputs/
 
-/__pycache__
-.pyc
+*.sh
