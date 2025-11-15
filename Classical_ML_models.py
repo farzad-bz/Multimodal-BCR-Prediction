@@ -209,7 +209,7 @@ def run_survival_cv_benchmark(
     return res_df, summary
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Predicting biochemical recurrence (BCR) using multimodal data")
+    parser = argparse.ArgumentParser(description="Predicting biochemical recurrence (BCR) using classical ML models(clinical only)")
     parser.add_argument(
         "--config",
         type=str,

@@ -9,6 +9,7 @@ import numpy as np
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+import argparse
 
 def load_mha(path):
     img = sitk.ReadImage(path)
@@ -16,19 +17,6 @@ def load_mha(path):
     return img, arr
 
 
-clinical_data_paths = glob('./clinical_data/*.json')
-
-# Read all JSON files and combine into a single DataFrame
-data_list = []
-for file_path in clinical_data_paths:
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-        data = {'patient_id': int(os.path.basename(file_path).replace('.json', '')), **data}
-        data_list.append(data)
-
-clinical_df = pd.DataFrame(data_list)
-#corss reference with data split file (data_split_5fold.csv)
-clinical_df = pd.merge(pd.read_csv('./data_split_5fold.csv'), clinical_df, on='patient_id', how='inner')
 
 
 # A function to fill missing values using KNN Imputer:
@@ -61,111 +49,82 @@ def fill_missing_values(df, column_to_fill, important_columns, n_neighbors=5, ad
 
     return df
 
-# Tertiary → less common pattern, only recorded if present, so we fill NaN with 0 when not present
-clinical_df["tertiary_gleason"] = clinical_df["tertiary_gleason"].fillna(0)
-# Distribution is long-tailed to the right, therefore we apply a log transformation
-clinical_df["pre_operative_PSA_log"] = np.log1p(clinical_df["pre_operative_PSA"])
 
-# Chagne BCR values to numeric
-clinical_df["BCR"] = pd.to_numeric(clinical_df["BCR"], errors="coerce")
-# BCR == 0 → BCR_PSA == 0 no recurrence, PSA never rose again, removed NaN.
-clinical_df.loc[clinical_df["BCR"] == 0.0, "BCR_PSA"] = 0.0
-#Because pathologic T stages are ordered by disease severity, we can safely treat trandorm them as ordinal
-pT_mapping = {
-    "2": 2.0, "2a": 2.25, "2b": 2.5, "2c": 2.75,
-    "3": 3.0, "3a": 3.25, "3b": 3.5, "3c": 3.5,
-    "4": 4.0, "4a": 4.0,  "4b": 4.0, "4c": 4.0, 
-} # There are no 4a, 4b, 4c, or 3c in the pT standars stages, (might be a typo), therefore map them to the same value as 4 or 3b respectively.
-clinical_df["pT_stage_num"] = clinical_df["pT_stage"].map(pT_mapping)
+def prepare_datafrme(args):
 
-# Fill unknown values for positive_lymph_nodes using KNN imputer
-# map to 0/1/nan
-clinical_df['positive_lymph_nodes'] = clinical_df['positive_lymph_nodes'].map({"0":0, "1":1, "x":np.nan})
-if clinical_df['positive_lymph_nodes'].isna().any():
-    clinical_df = fill_missing_values(
-        clinical_df,
-        column_to_fill="positive_lymph_nodes",
-        important_columns=[
-                        "primary_gleason",
-                        "secondary_gleason",
-                        "tertiary_gleason",
-                        "pT_stage_num",
-                        "ISUP",
-                        "pre_operative_PSA_log"],
-        n_neighbors=5,
-        is_int=True
-    )
-    
-# Fill unknown values for positive_lymph_nodes using KNN imputer    
-clinical_df['invasion_seminal_vesicles'] = clinical_df['invasion_seminal_vesicles'].map({"0":0, "1":1, "x":np.nan})
-if clinical_df['invasion_seminal_vesicles'].isna().any():
-    clinical_df = fill_missing_values(
-        clinical_df,
-        column_to_fill="invasion_seminal_vesicles",
-        important_columns=["pT_stage_num",
-                        "ISUP",
-                        "primary_gleason",
-                        "secondary_gleason",
-                        "tertiary_gleason",
-                    ],
-        n_neighbors=5,
-        is_int=True
-    )
-    
-    
-    
-# Fill unknown values for positive_lymph_nodes using KNN imputer    
-clinical_df['capsular_penetration'] = clinical_df['capsular_penetration'].map({"0":0, "1":1, "x":np.nan})
-if clinical_df['capsular_penetration'].isna().any():
-    clinical_df = fill_missing_values(
-        clinical_df,
-        column_to_fill="capsular_penetration",
-        important_columns=["pT_stage_num",
-                        "ISUP",
-                        "primary_gleason",
-                        "secondary_gleason",
-                        "tertiary_gleason",
-                        "pre_operative_PSA_log",
-                        "invasion_seminal_vesicles",
-                    ],
-        n_neighbors=5,
-        is_int=True
-    )
+    clinical_data_paths = glob(f'{args.clinical_dir}/*.json')
 
-# For positive_surgical_margins, all values are known (0, and 1), and ther are no '2' values which corresponds to unknown. But for safety, we check check that too.
-clinical_df['positive_surgical_margins'] = clinical_df['positive_surgical_margins'].map({0:0, 1:1, 2:np.nan})
-if clinical_df['positive_surgical_margins'].isna().any():
-    clinical_df = fill_missing_values(
-        clinical_df,
-        column_to_fill="positive_surgical_margins",
-        important_columns=["pT_stage_num",
-                        "ISUP",
-                        "primary_gleason",
-                        "secondary_gleason",
-                        "tertiary_gleason",
-                        "pre_operative_PSA_log",
-                        "invasion_seminal_vesicles",
-                    ],
-        n_neighbors=5,
-        is_int=True
-    )
+    # Read all JSON files and combine into a single DataFrame
+    data_list = []
+    for file_path in clinical_data_paths:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+            data = {'patient_id': int(os.path.basename(file_path).replace('.json', '')), **data}
+            data_list.append(data)
 
+    clinical_df = pd.DataFrame(data_list)
+    #corss reference with data split file (data_split_5fold.csv)
+    clinical_df = pd.merge(pd.read_csv(args.split_path), clinical_df, on='patient_id', how='inner')
 
-# Chagne lymphovascular_invasion values to numeric
-clinical_df["lymphovascular_invasion"] = pd.to_numeric(clinical_df["lymphovascular_invasion"], errors="coerce")
+    # Tertiary → less common pattern, only recorded if present, so we fill NaN with 0 when not present
+    clinical_df["tertiary_gleason"] = clinical_df["tertiary_gleason"].fillna(0)
+    # Distribution is long-tailed to the right, therefore we apply a log transformation
+    clinical_df["pre_operative_PSA_log"] = np.log1p(clinical_df["pre_operative_PSA"])
 
+    # Chagne BCR values to numeric
+    clinical_df["BCR"] = pd.to_numeric(clinical_df["BCR"], errors="coerce")
+    # BCR == 0 → BCR_PSA == 0 no recurrence, PSA never rose again, removed NaN.
+    clinical_df.loc[clinical_df["BCR"] == 0.0, "BCR_PSA"] = 0.0
+    #Because pathologic T stages are ordered by disease severity, we can safely treat trandorm them as ordinal
+    pT_mapping = {
+        "2": 2.0, "2a": 2.25, "2b": 2.5, "2c": 2.75,
+        "3": 3.0, "3a": 3.25, "3b": 3.5, "3c": 3.5,
+        "4": 4.0, "4a": 4.0,  "4b": 4.0, "4c": 4.0, 
+    } # There are no 4a, 4b, 4c, or 3c in the pT standars stages, (might be a typo), therefore map them to the same value as 4 or 3b respectively.
+    clinical_df["pT_stage_num"] = clinical_df["pT_stage"].map(pT_mapping)
 
-
-# Add three columns for earlier_therapy, showing radiotherapy, hormone_therapy, and cryotherapy
-therapy_keywords = ["radiotherapy", "cryotherapy", "hormones"]
-for t in therapy_keywords:
-    clinical_df[t] = clinical_df["earlier_therapy"].str.contains(t, na=False).astype(int)
-clinical_df.loc[clinical_df["earlier_therapy"] == "unknown", therapy_keywords] = np.nan
-for t in therapy_keywords:
-    if clinical_df[t].isna().any():
+    # Fill unknown values for positive_lymph_nodes using KNN imputer
+    # map to 0/1/nan
+    clinical_df['positive_lymph_nodes'] = clinical_df['positive_lymph_nodes'].map({"0":0, "1":1, "x":np.nan})
+    if clinical_df['positive_lymph_nodes'].isna().any():
         clinical_df = fill_missing_values(
             clinical_df,
-            column_to_fill=t,
+            column_to_fill="positive_lymph_nodes",
+            important_columns=[
+                            "primary_gleason",
+                            "secondary_gleason",
+                            "tertiary_gleason",
+                            "pT_stage_num",
+                            "ISUP",
+                            "pre_operative_PSA_log"],
+            n_neighbors=5,
+            is_int=True
+        )
+        
+    # Fill unknown values for positive_lymph_nodes using KNN imputer    
+    clinical_df['invasion_seminal_vesicles'] = clinical_df['invasion_seminal_vesicles'].map({"0":0, "1":1, "x":np.nan})
+    if clinical_df['invasion_seminal_vesicles'].isna().any():
+        clinical_df = fill_missing_values(
+            clinical_df,
+            column_to_fill="invasion_seminal_vesicles",
+            important_columns=["pT_stage_num",
+                            "ISUP",
+                            "primary_gleason",
+                            "secondary_gleason",
+                            "tertiary_gleason",
+                        ],
+            n_neighbors=5,
+            is_int=True
+        )
+        
+        
+        
+    # Fill unknown values for positive_lymph_nodes using KNN imputer    
+    clinical_df['capsular_penetration'] = clinical_df['capsular_penetration'].map({"0":0, "1":1, "x":np.nan})
+    if clinical_df['capsular_penetration'].isna().any():
+        clinical_df = fill_missing_values(
+            clinical_df,
+            column_to_fill="capsular_penetration",
             important_columns=["pT_stage_num",
                             "ISUP",
                             "primary_gleason",
@@ -178,15 +137,63 @@ for t in therapy_keywords:
             is_int=True
         )
 
-clinical_df.to_csv('./data/clinical_data_processed.csv')
+    # For positive_surgical_margins, all values are known (0, and 1), and ther are no '2' values which corresponds to unknown. But for safety, we check check that too.
+    clinical_df['positive_surgical_margins'] = clinical_df['positive_surgical_margins'].map({0:0, 1:1, 2:np.nan})
+    if clinical_df['positive_surgical_margins'].isna().any():
+        clinical_df = fill_missing_values(
+            clinical_df,
+            column_to_fill="positive_surgical_margins",
+            important_columns=["pT_stage_num",
+                            "ISUP",
+                            "primary_gleason",
+                            "secondary_gleason",
+                            "tertiary_gleason",
+                            "pre_operative_PSA_log",
+                            "invasion_seminal_vesicles",
+                        ],
+            n_neighbors=5,
+            is_int=True
+        )
 
-for col in clinical_df.columns:
-    print('=**='*20)
-    print(col, ": ")
-    print(clinical_df[col].dtype, clinical_df[col].nunique(), clinical_df[col].isna().sum())
-    if clinical_df[col].nunique() <= 10:
-        print(clinical_df[col].value_counts())
-        
+
+    # Chagne lymphovascular_invasion values to numeric
+    clinical_df["lymphovascular_invasion"] = pd.to_numeric(clinical_df["lymphovascular_invasion"], errors="coerce")
+
+
+
+    # Add three columns for earlier_therapy, showing radiotherapy, hormone_therapy, and cryotherapy
+    therapy_keywords = ["radiotherapy", "cryotherapy", "hormones"]
+    for t in therapy_keywords:
+        clinical_df[t] = clinical_df["earlier_therapy"].str.contains(t, na=False).astype(int)
+    clinical_df.loc[clinical_df["earlier_therapy"] == "unknown", therapy_keywords] = np.nan
+    for t in therapy_keywords:
+        if clinical_df[t].isna().any():
+            clinical_df = fill_missing_values(
+                clinical_df,
+                column_to_fill=t,
+                important_columns=["pT_stage_num",
+                                "ISUP",
+                                "primary_gleason",
+                                "secondary_gleason",
+                                "tertiary_gleason",
+                                "pre_operative_PSA_log",
+                                "invasion_seminal_vesicles",
+                            ],
+                n_neighbors=5,
+                is_int=True
+            )
+
+    clinical_df.to_csv(f'{args.out_dir}/clinical_data_processed.csv')
+
+    for col in clinical_df.columns:
+        print('=**='*20)
+        print(col, ": ")
+        print(clinical_df[col].dtype, clinical_df[col].nunique(), clinical_df[col].isna().sum())
+        if clinical_df[col].nunique() <= 10:
+            print(clinical_df[col].value_counts())
+    
+    return clinical_df
+            
 
 
 
@@ -318,58 +325,101 @@ def crop_or_pad_to_size(image, target_size=(32, 256, 256), pad_value=0):
     return padded
 
 
+def preprocess_MRI(args, clinical_df):
+    target_size = (32, 256, 256)
+    spacing = (0.3, 0.3, 3.0)
+    out_dir = args.out_dir
 
-target_size = (32, 256, 256)
-spacing = (0.3, 0.3, 3.0)
-out_dir = './data/preprcoessed_mpMRI'
+    for patient_id in tqdm(clinical_df['patient_id'].tolist()):
 
-for patient_id in tqdm(clinical_df['patient_id'].tolist()):
+        t2_path = f"{args.radiology_dir}/mpMRI/{patient_id}/{patient_id}_0001_t2w.mha"
+        hbv_path = f"{args.radiology_dir}/mpMRI/{patient_id}/{patient_id}_0001_hbv.mha"
+        adc_path = f"{args.radiology_dir}/mpMRI/{patient_id}/{patient_id}_0001_adc.mha"
+        mask_path = f"{args.radiology_dir}/prostate_mask_t2w/{patient_id}_0001_mask.mha"
 
-    t2_path = f"./radiology/mpMRI/{patient_id}/{patient_id}_0001_t2w.mha"
-    hbv_path = f"./radiology/mpMRI/{patient_id}/{patient_id}_0001_hbv.mha"
-    adc_path = f"./radiology/mpMRI/{patient_id}/{patient_id}_0001_adc.mha"
-    mask_path = f"./radiology/prostate_mask_t2w/{patient_id}_0001_mask.mha"
+        # load all
+        t2_img  = sitk.ReadImage(t2_path)
+        adc_img = sitk.ReadImage(adc_path)
+        hbv_img = sitk.ReadImage(hbv_path)
+        mask_img = sitk.ReadImage(mask_path)
 
-    # load all
-    t2_img  = sitk.ReadImage(t2_path)
-    adc_img = sitk.ReadImage(adc_path)
-    hbv_img = sitk.ReadImage(hbv_path)
-    mask_img = sitk.ReadImage(mask_path)
+        # resample ADC/HBV/mask to T2 space
+        t2_rs  = resample_to_spacing(t2_img, spacing, is_label=False)
+        adc_rs  = resample_to_reference(adc_img,  t2_rs, is_label=False)
+        hbv_rs  = resample_to_reference(hbv_img,  t2_rs, is_label=False)
+        mask_rs = resample_to_reference(mask_img, t2_rs, is_label=True)
 
-    # resample ADC/HBV/mask to T2 space
-    t2_rs  = resample_to_spacing(t2_img, spacing, is_label=False)
-    adc_rs  = resample_to_reference(adc_img,  t2_rs, is_label=False)
-    hbv_rs  = resample_to_reference(hbv_img,  t2_rs, is_label=False)
-    mask_rs = resample_to_reference(mask_img, t2_rs, is_label=True)
+        # convert to numpy
+        t2_arr  = sitk.GetArrayFromImage(t2_rs)
+        adc_arr = sitk.GetArrayFromImage(adc_rs)
+        hbv_arr = sitk.GetArrayFromImage(hbv_rs)
+        mask_arr = sitk.GetArrayFromImage(mask_rs)
 
-    # convert to numpy
-    t2_arr  = sitk.GetArrayFromImage(t2_rs)
-    adc_arr = sitk.GetArrayFromImage(adc_rs)
-    hbv_arr = sitk.GetArrayFromImage(hbv_rs)
-    mask_arr = sitk.GetArrayFromImage(mask_rs)
+        t2_arr[mask_arr==0] = 0
+        adc_arr[mask_arr==0] = 0
+        hbv_arr[mask_arr==0] = 0
+        
+        min_idx = np.array(np.where(mask_arr > 0)).min(axis=1)
+        max_idx = np.array(np.where(mask_arr > 0)).max(axis=1)
 
-    t2_arr[mask_arr==0] = 0
-    adc_arr[mask_arr==0] = 0
-    hbv_arr[mask_arr==0] = 0
+        t2_arr = t2_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
+        adc_arr = adc_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
+        hbv_arr = hbv_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
+        mask_arr = mask_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
+        
+        t2_arr = crop_or_pad_to_size(t2_arr, target_size=target_size)
+        adc_arr = crop_or_pad_to_size(adc_arr, target_size=target_size)
+        hbv_arr = crop_or_pad_to_size(hbv_arr, target_size=target_size)
+        mask_arr = crop_or_pad_to_size(mask_arr, target_size=target_size)
+
+        t2_arr = np.clip(t2_arr/t2_arr.max(), 0, 1)
+        adc_arr = np.clip(adc_arr/adc_arr.max(), 0, 1)
+        hbv_arr = np.clip(hbv_arr/hbv_arr.max(), 0, 1)
+
+        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_t2.npy', t2_arr)
+        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_adc.npy', adc_arr)
+        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_hbv.npy', hbv_arr)
+        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_mask.npy', mask_arr)
+    print(f'Preprocessed data saved in {out_dir}')
     
-    min_idx = np.array(np.where(mask_arr > 0)).min(axis=1)
-    max_idx = np.array(np.where(mask_arr > 0)).max(axis=1)
-
-    t2_arr = t2_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
-    adc_arr = adc_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
-    hbv_arr = hbv_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
-    mask_arr = mask_arr[min_idx[0]:max_idx[0]+1, min_idx[1]:max_idx[1]+1, min_idx[2]:max_idx[2]+1]
     
-    t2_arr = crop_or_pad_to_size(t2_arr, target_size=target_size)
-    adc_arr = crop_or_pad_to_size(adc_arr, target_size=target_size)
-    hbv_arr = crop_or_pad_to_size(hbv_arr, target_size=target_size)
-    mask_arr = crop_or_pad_to_size(mask_arr, target_size=target_size)
+    
 
-    t2_arr = np.clip(t2_arr/t2_arr.max(), 0, 1)
-    adc_arr = np.clip(adc_arr/adc_arr.max(), 0, 1)
-    hbv_arr = np.clip(hbv_arr/hbv_arr.max(), 0, 1)
-
-    np.save(f'./{out_dir}/{patient_id}_t2.npy', t2_arr)
-    np.save(f'./{out_dir}/{patient_id}_adc.npy', adc_arr)
-    np.save(f'./{out_dir}/{patient_id}_hbv.npy', hbv_arr)
-    np.save(f'./{out_dir}/{patient_id}_mask.npy', mask_arr)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Preparing data for BCR Prediction")
+    parser.add_argument(
+        "--radiology-dir",
+        type=str,
+        required=True,
+        help="Path to radiology data"
+    )  
+    
+    parser.add_argument(
+        "--clinical-dir",
+        type=str,
+        required=True,
+        help="Path to clinical data"
+    )  
+    
+    parser.add_argument(
+        "--split-path",
+        type=str,
+        required=True,
+        help="Path to split data (5 fold split)"
+    )    
+    
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default='./data/',
+        help="Path to save processed data and dataframe"
+    )    
+    
+    
+    
+    args = parser.parse_args()
+    
+    os.makedirs(f'{args.out_dir}/preprcoessed_mpMRI/', exist_ok=True)
+    clinical_df = prepare_datafrme(args)
+    preprocess_MRI(args, clinical_df)
+    
