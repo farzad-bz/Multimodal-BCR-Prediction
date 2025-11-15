@@ -1,4 +1,4 @@
-# 🧠 Multimodal BCR Prediction
+# Multimodal BCR Prediction
 Use pre-operative multi-parametric MRI (mpMRI) together with clinical covariates to predict biochemical recurrence (BCR) in prostate cancer. The pipeline freezes an M3D-CLIP volumetric encoder, trains a lightweight survival head, and reports cross-validated concordance index (C-index) for reproducible benchmarking.
 
 ---
