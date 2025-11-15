@@ -18,7 +18,7 @@ from sksurv.ensemble import RandomSurvivalForest, GradientBoostingSurvivalAnalys
 from sksurv.svm import FastSurvivalSVM
 
 from lifelines import CoxPHFitter
-import argpars
+import argparse
 
 
 def run_survival_cv_benchmark(
@@ -165,28 +165,6 @@ def run_survival_cv_benchmark(
         risk = pipe.predict(X_va)  # higher risk -> shorter survival
         return cindex_sksurv(T_va, E_va, risk)
 
-    def run_fastsurvsvm(X_tr, T_tr, E_tr, X_va, T_va, E_va):
-        y_tr = Surv.from_arrays(event=E_tr.astype(bool), time=T_tr)
-        pipe = Pipeline([
-            ("imp", SimpleImputer(strategy="median")),
-            ("scl", StandardScaler()),
-            ("svm", FastSurvivalSVM(alpha=1e-4, rank_ratio=0.5, max_iter=5000, random_state=0))
-        ])
-        pipe.fit(X_tr, y_tr)
-
-        try:
-            risk = pipe.predict(X_va)
-        except AttributeError:
-            Xva_imp = pipe.named_steps["imp"].transform(X_va)
-            Xva_scl = pipe.named_steps["scl"].transform(Xva_imp)
-            risk = pipe.named_steps["svm"].decision_function(Xva_scl)
-
-        # ⬅️  Flip sign so that higher = higher risk (shorter survival)
-        risk = -risk
-
-        return cindex_sksurv(T_va, E_va, risk)
-
-
     # -------------------------
     # CV loop
     # -------------------------
@@ -195,7 +173,6 @@ def run_survival_cv_benchmark(
         ("Coxnet (elastic-net Cox)", run_coxnet),
         ("Random Survival Forest", run_rsf),
         ("GB Survival Analysis", run_gbsa),
-        ("Fast Survival SVM", run_fastsurvsvm),
     ]
 
     # fold = 0
@@ -211,14 +188,6 @@ def run_survival_cv_benchmark(
         T_tr, T_va = T[tr_idx], T[va_idx]
         E_tr, E_va = E[tr_idx], E[va_idx]
         
-    # fold = 0 
-    # for tr_idx, va_idx in skf.split(X, E): 
-    #     fold += 1 
-    #     X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx] 
-    #     T_tr, T_va = T[tr_idx], T[va_idx] 
-    #     E_tr, E_va = E[tr_idx], E[va_idx]  
-        
-
         for name, runner in model_specs:
             try:
                 c = runner(X_tr, T_tr, E_tr, X_va, T_va, E_va)
