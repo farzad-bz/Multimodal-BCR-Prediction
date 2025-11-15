@@ -2,7 +2,7 @@
 # Experiment identity
 # =========================
 exp:
-  name: "t2_only"
+  name: "M3D-CLIP_hbv_and_clinical"
   output_dir: "./outputs/"     # will be created if missing
   seed: 42
 
@@ -10,12 +10,12 @@ exp:
 # Data
 # =========================
 data:
-  mpMRI_dir: "./data/preprcoessed_mpMRI/"
+  mpMRI_dir: "./data/preprocessed_mpMRI_M3D-CLIP/"
   clinical_df_path: "./data/clinical_data_processed.csv"
   modalities: #modalities to use for training the model
-    # - clinical
-    - t2
-    # - hbv
+    - clinical
+    # - t2
+    - hbv
     # - adc
   features: #features to use from clinical_data
     - ISUP 
@@ -26,7 +26,7 @@ data:
     - age_at_prostatectomy
   num_workers: 4
   pin_memory: true
-  aug: false
+  aug: true
 
 fusion_model:
   embed_dim: 16
@@ -36,6 +36,7 @@ fusion_model:
 # =========================
 
 image_encoder:
+  type: "M3D-CLIP"
   pretrained_path: GoodBaiBai88/M3D-CLIP
   embed_dim: 768
 

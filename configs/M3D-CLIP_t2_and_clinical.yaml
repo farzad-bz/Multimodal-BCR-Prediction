@@ -2,7 +2,7 @@
 # Experiment identity
 # =========================
 exp:
-  name: "clinical_only"
+  name: "M3D-CLIP_t2_and_clinical"
   output_dir: "./outputs/"     # will be created if missing
   seed: 42
 
@@ -10,11 +10,11 @@ exp:
 # Data
 # =========================
 data:
-  mpMRI_dir: "./data/preprocessed_mpMRI_MedicalNet/"
+  mpMRI_dir: "./data/preprocessed_mpMRI_M3D-CLIP/"
   clinical_df_path: "./data/clinical_data_processed.csv"
   modalities: #modalities to use for training the model
     - clinical
-    # - t2
+    - t2
     # - hbv
     # - adc
   features: #features to use from clinical_data
@@ -36,9 +36,9 @@ fusion_model:
 # =========================
 
 image_encoder:
-  type: "None"
-  pretrained_path: "None"
-  embed_dim: 0
+  type: M3D-CLIP
+  pretrained_path: GoodBaiBai88/M3D-CLIP
+  embed_dim: 768
 
 # =========================
 # Optimization

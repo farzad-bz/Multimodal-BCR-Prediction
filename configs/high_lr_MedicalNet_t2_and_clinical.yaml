@@ -2,7 +2,7 @@
 # Experiment identity
 # =========================
 exp:
-  name: "clinical_only"
+  name: "high_lr_MedicalNet_t2_and_clinical"
   output_dir: "./outputs/"     # will be created if missing
   seed: 42
 
@@ -14,7 +14,7 @@ data:
   clinical_df_path: "./data/clinical_data_processed.csv"
   modalities: #modalities to use for training the model
     - clinical
-    # - t2
+    - t2
     # - hbv
     # - adc
   features: #features to use from clinical_data
@@ -36,15 +36,16 @@ fusion_model:
 # =========================
 
 image_encoder:
-  type: "None"
-  pretrained_path: "None"
-  embed_dim: 0
+  type: MedicalNet
+  pretrained_path: TencentMedicalNet/MedicalNet-Resnet10
+  embed_dim: 512
+  
 
 # =========================
 # Optimization
 # =========================
 optim:
-  lr: 0.0004
+  lr: 0.001
   weight_decay: 0.001
   scheduler_patience: 10
   scheduler_factor: 0.5

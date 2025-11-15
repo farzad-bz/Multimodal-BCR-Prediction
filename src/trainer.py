@@ -29,21 +29,33 @@ def train_one_fold(cfg, M3D_model, modalities, ld_tr, ld_va, T_va_np, E_va_np, f
             if "t2" in inputs:
                 vol = inputs["t2"].to(device)  # (B, 1, D, H, W)
                 with torch.no_grad():
-                    t2_emb = M3D_model.encode_image(vol)[:, 0]  # (B, 768)
+                    if cfg.image_encoder.type == "M3D-CLIP" :
+                        t2_emb = M3D_model.encode_image(vol)[:, 0]  # (B, 768)
+                    else:
+                        t2_emb = M3D_model.forward(vol)
+                        t2_emb = torch.amax(t2_emb, dim=[2,3,4])
                 mm_inputs["t2"] = t2_emb
 
             if "hbv" in inputs:
                 vol = inputs["hbv"].to(device)
                 # same preprocessing...
                 with torch.no_grad():
-                    hbv_emb = M3D_model.encode_image(vol)[:, 0]
+                    if cfg.image_encoder.type == "M3D-CLIP" :
+                        hbv_emb = M3D_model.encode_image(vol)[:, 0]
+                    else:
+                        hbv_emb = M3D_model.forward(vol)
+                        hbv_emb = torch.amax(hbv_emb, dim=[2,3,4])
                 mm_inputs["hbv"] = hbv_emb
 
             if "adc" in inputs:
                 vol = inputs["adc"].to(device)
                 # same preprocessing...
                 with torch.no_grad():
-                    adc_emb = M3D_model.encode_image(vol)[:, 0]
+                    if cfg.image_encoder.type == "M3D-CLIP" :
+                        adc_emb = M3D_model.encode_image(vol)[:, 0]
+                    else:
+                        adc_emb = M3D_model.forward(vol)
+                        adc_emb = torch.amax(adc_emb, dim=[2,3,4])
                 mm_inputs["adc"] = adc_emb
 
 
@@ -71,19 +83,31 @@ def train_one_fold(cfg, M3D_model, modalities, ld_tr, ld_va, T_va_np, E_va_np, f
                     # inputs["t2"]: (B, 1, D, H, W)  ->  adapt shape to (B, 32, 256, 256)
                     vol = inputs["t2"].to(device)  # (B, 1, D, H, W)
                     with torch.no_grad():
-                        t2_emb = M3D_model.encode_image(vol)[:, 0]  # (B, 768)
+                        if cfg.image_encoder.type == "M3D-CLIP" :
+                            t2_emb = M3D_model.encode_image(vol)[:, 0]  # (B, 768)
+                        else:
+                            t2_emb = M3D_model.forward(vol)
+                            t2_emb = torch.amax(t2_emb, dim=[2,3,4])
                     mm_inputs["t2"] = t2_emb
 
                 if "hbv" in inputs:
                     vol = inputs["hbv"].to(device)
                     with torch.no_grad():
-                        hbv_emb = M3D_model.encode_image(vol)[:, 0]
+                        if cfg.image_encoder.type == "M3D-CLIP" :
+                            hbv_emb = M3D_model.encode_image(vol)[:, 0]
+                        else:
+                            hbv_emb = M3D_model.forward(vol)
+                            hbv_emb = torch.amax(hbv_emb, dim=[2,3,4])
                     mm_inputs["hbv"] = hbv_emb
 
                 if "adc" in inputs:
                     vol = inputs["adc"].to(device)
                     with torch.no_grad():
-                        adc_emb = M3D_model.encode_image(vol)[:, 0]
+                        if cfg.image_encoder.type == "M3D-CLIP" :
+                            adc_emb = M3D_model.encode_image(vol)[:, 0]
+                        else:
+                            adc_emb = M3D_model.forward(vol)
+                            adc_emb = torch.amax(adc_emb, dim=[2,3,4])
                     mm_inputs["adc"] = adc_emb
 
                 r = model(mm_inputs).detach().cpu().numpy()

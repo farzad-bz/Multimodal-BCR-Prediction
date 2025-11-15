@@ -2,7 +2,7 @@
 # Experiment identity
 # =========================
 exp:
-  name: "hbv_and_clinical"
+  name: "MedicalNet_t2_and_hbv_and_clinical"
   output_dir: "./outputs/"     # will be created if missing
   seed: 42
 
@@ -10,11 +10,11 @@ exp:
 # Data
 # =========================
 data:
-  mpMRI_dir: "./data/preprcoessed_mpMRI/"
+  mpMRI_dir: "./data/preprocessed_mpMRI_MedicalNet/"
   clinical_df_path: "./data/clinical_data_processed.csv"
   modalities: #modalities to use for training the model
     - clinical
-    # - t2
+    - t2
     - hbv
     # - adc
   features: #features to use from clinical_data
@@ -26,7 +26,7 @@ data:
     - age_at_prostatectomy
   num_workers: 4
   pin_memory: true
-  aug: false
+  aug: true
 
 fusion_model:
   embed_dim: 16
@@ -36,8 +36,9 @@ fusion_model:
 # =========================
 
 image_encoder:
-  pretrained_path: GoodBaiBai88/M3D-CLIP
-  embed_dim: 768
+  type: MedicalNet
+  pretrained_path: TencentMedicalNet/MedicalNet-Resnet10
+  embed_dim: 512
 
 # =========================
 # Optimization

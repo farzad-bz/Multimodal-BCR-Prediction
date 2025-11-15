@@ -1,79 +1,84 @@
-# Multimodal BCR Prediction
-Use pre-operative multi-parametric MRI (mpMRI) together with clinical covariates to predict biochemical recurrence (BCR) in prostate cancer. The pipeline freezes an M3D-CLIP volumetric encoder, trains a lightweight survival head, and reports cross-validated concordance index (C-index) for reproducible benchmarking.
+#  Multimodal BCR Prediction
+Predict biochemical recurrence (BCR) in prostate cancer by fusing clinical covariates with pre-operative multi-parametric MRI (mpMRI). The pipeline freezes a volumetric encoder (M3D-CLIP or MedicalNet), feeds modality embeddings to a lightweight survival head, and reports five-fold cross-validated concordance (C-index). Training summaries are automatically appended to `results.csv` for easy leaderboard tracking.
 
 ---
 
-## 🗂️ Repository Layout
-- `configs/base.yaml` – central configuration for data paths, modalities, optimization, and logging.
-- `data/` – processed clinical spreadsheet, five-fold split helpers, and `{patient_id}_{t2|hbv|adc}.npy` MRI tensors.
-- `src/data_utils.py` – TorchIO augmentations, modality loaders, and standardized `DataLoader` builders.
-- `src/models.py` – the modular fusion head (`SurvivalModelMM`) plus `get_image_encoder`.
-- `src/trainer.py` – ranking-loss training with per-fold validation, LR scheduling, and early stopping.
-- `train.py` – main entry point that wires data prep, training, and logging.
+## 🧭 Repository Map
+| Path | Purpose |
+| --- | --- |
+| `configs/*.yaml` | Ready-to-run configs spanning clinical-only baselines, MedicalNet, and M3D-CLIP modality mixes (LR sweeps, augmentation toggles, etc.). |
+| `prepare_and_preparoces_data.py` | Helper script that assembles the processed clinical CSV and `{patient_id}_{modality}.npy` volumes. |
+| `src/data_utils.py` | Loads clinical/MRI tensors, applies TorchIO augmentations, and builds PyTorch `DataLoader`s. |
+| `src/models.py` | Implements `SurvivalModelMM` plus helpers that download frozen volumetric encoders from the Hugging Face Hub. |
+| `src/trainer.py` | Pairwise-ranking training loop with LR scheduling, early stopping, and per-fold validation logging. |
+| `train.py` | Cross-validation driver: prepares data, trains each fold, writes checkpoints, and logs metrics to `results.csv`. |
+| `Classical_ML_models.py`, `evaluate.py` | Scaffolding for clinical-only baselines and held-out evaluation scripts. |
 
 ---
 
 ## ⚙️ Environment Setup
-Create a Python 3.9+ environment and install dependencies (`torch`, `torchvision`, `torchio`, `transformers`, `omegaconf`, `pandas`, `numpy`, `scikit-learn`, `lifelines`, `wandb`, etc.). A CUDA-capable GPU speeds up M3D-CLIP embedding.
+1. Use Python ≥3.9 with CUDA-enabled PyTorch for the volumetric encoders.
+2. Install dependencies via pip (Conda users can initialize an environment first, then run the same commands):
 
 ```bash
-# 🐍 Virtualenv
 python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-
-# 🐚 Conda (optional)
-conda create -n multimodal-bcr python=3.9 -y
-conda activate multimodal-bcr
-pip install -r requirements.txt
 ```
 
 ---
 
-## 🧼 Data Preparation & Preprocessing
-1. **📄 Clinical spreadsheet**
-   - Ensure unique `patient_id` per row in the raw CSV.
-   - Create a `fold` column (from `data/data_split_5fold.csv` or your own split).
-   - Add survival labels `time_to_follow-up/BCR` and `BCR`.
-   - Engineer the six features listed in `configs/base.yaml` (including binary indicators for missing values) and save to `data/clinical_data_processed.csv`.
+## 🗂️ Data Requirements
+1. **Clinical spreadsheet — `data/clinical_data_processed.csv`**
+   - Contains `patient_id`, `fold` (integers 0–4), `time_to_follow-up/BCR` (>0), `BCR` (0/1), plus the engineered features referenced in each config (default: `ISUP`, `positive_lymph_nodes`, `lymphovascular_invasion`, `invasion_seminal_vesicles`, `positive_lymph_nodes_missing`, `age_at_prostatectomy`).
+   - You can reuse `data/data_split_5fold.csv` to populate the `fold` column or build your own splits; just ensure every fold index appears in the CSV.
 
-2. **🧲 mpMRI volumes**
-   - Run your MRI preprocessing (bias-field correction, resample, crop, normalize, etc.) for each modality (`t2`, `hbv`, `adc`).
-   - Save tensors as `numpy.save(f"{patient_id}_{modality}.npy", tensor)` under `data/preprcoessed_mpMRI/` with shape `(D, H, W)` so TorchIO can add the channel dimension.
+2. **MRI tensors**
+   - Preprocess the modalities you plan to use (`t2`, `hbv`, `adc`): bias-field correction, resampling, cropping, normalization.
+   - Save volumes as `np.save(f"{patient_id}_{modality}.npy", arr)` with shape `(D, H, W)` so TorchIO can add the channel dimension.
+   - Store arrays under:
+     - `data/preprcoessed_mpMRI_M3D-CLIP/` when training M3D-CLIP configs.
+     - `data/preprcoessed_mpMRI_MedicalNet/` when training MedicalNet configs.
+   - Every `patient_id` in the clinical CSV must have all modalities enabled in the chosen config.
 
-3. **🛠️ Optional automation**
-   - Use `prepare_and_preparoces_data.py` or the `Multimodal-Quiz/MRI_preprocessing.ipynb` notebook to batch the steps above.
-   - Double-check that every `patient_id` appearing in the clinical CSV has all requested modality files before training.
-
----
-
-## 📦 Data Expectations
-1. `data/clinical_data_processed.csv` – indexed by subject with the required features, `fold`, `patient_id`, `time_to_follow-up/BCR`, and `BCR`.
-2. `data/data_split_5fold.csv` – optional helper for constructing folds.
-3. `data/preprcoessed_mpMRI/` – `{patient_id}_{modality}.npy` tensors for each modality you plan to use.
-
-Keep `configs/base.yaml` synchronized with the actual feature names and modality availability.
+3. **Automation (optional)**
+   - `prepare_and_preparoces_data.py` and `Multimodal-Quiz/MRI_preprocessing.ipynb` demonstrate scripted/notebook-based preprocessing pipelines.
 
 ---
 
-## 🚀 Running an Experiment
+## 🧪 Configuring Experiments
+Each YAML config defines:
+- `exp.*` → experiment name, random seed, output directory root.
+- `data.*` → file paths, modality list (`clinical`, `t2`, `hbv`, `adc`), engineered features, dataloader workers, pin-memory, augmentation flag.
+- `fusion_model.embed_dim` → dimension each modality projects into before fusion.
+- `image_encoder.*` → encoder choice (`MedicalNet` via `TencentMedicalNet/MedicalNet-Resnet10`, `M3D-CLIP` via `GoodBaiBai88/M3D-CLIP`) and the matching embedding size.
+- `optim.*` / `train.*` → AdamW LR + weight decay, ReduceLROnPlateau factor/patience, gradient clipping, batch size, grad accumulation, epochs, early-stop patience.
+- `wandb_logging.*` → enable online logging or switch to offline mode for air-gapped runs.
+
+Duplicate a template (e.g., `configs/M3D-CLIP_hbv_and_clinical.yaml`) to explore new modality mixes, augmentation policies, or LR sweeps.
+
+---
+
+## 🚀 Training Workflow
 ```bash
-python train.py --config configs/base.yaml
+python train.py --config configs/M3D-CLIP_t2_and_clinical.yaml
 ```
-Key knobs inside the config:
-- `data.modalities` – toggle which inputs are fused (e.g., enable `hbv`/`adc` to add MRI channels).
-- `fusion_model.embed_dim` – shared representation size per modality before fusion.
-- `train.batch_size`, `train.epochs`, `train.stop_patience` – runtime and early stopping behavior.
-- `wandb_logging.enabled` – set `false` for offline experiments.
+`train.py` performs:
+1. Deterministic seeding + device selection (`src/utils.py`).
+2. Loading of clinical tables, MRI tensors, and the frozen encoder weights (`src/data_utils.prepare_data`, `src.models.get_image_encoder`).
+3. Five-fold cross-validation based on the `fold` column:
+   - Build TorchIO-augmented loaders via `src/data_utils.make_loaders`.
+   - Train `SurvivalModelMM` with the pairwise ranking loss (`src/losses.py`) and ReduceLROnPlateau scheduling (`src/trainer.py`).
+   - Save the best checkpoint per fold to `outputs/<exp.name>/<run_id>/SurvivalModelMM_fold{fold}_best.pt`.
+   - Stream metrics to stdout, optionally to Weights & Biases, and append C-index stats to `results.csv` (per fold, mean, std, encoder settings, modalities, augmentation flag).
 
-Each run writes `outputs/<exp.name>/<run_id>/` with logs, the exact config snapshot, model checkpoints, and metrics (C-index per fold printed to stdout).
+Repeat with different configs (clinical-only baseline, MedicalNet sweeps, M3D-CLIP variants) to grow a comparable leaderboard inside `results.csv`.
 
 ---
 
-## 🔍 Evaluation & Extension
-- Extend `train.py` or complete `evaluate.py` for held-out testing using `src/data_utils.make_loaders`.
-- Populate `Classical_ML_models.py` with scikit-learn baselines to compare against the multimodal model.
-- Swap `image_encoder.pretrained_path` if you want to experiment with other 3D medical encoders that expose `encode_image`.
+## 📈 Evaluation & Extensions
+- `evaluate.py` – load a saved checkpoint and reuse `src/data_utils.make_loaders` for held-out testing.
+- `Classical_ML_models.py` – implement CoxPH, Random Survival Forests, or other scikit-learn baselines on the clinical-only features.
+- `SurvivalModelMM` is modality-agnostic; add new inputs by declaring their dimensions in the `modalities` dict and providing embeddings during training/inference.
 
-Happy experimenting! 🧪🚀

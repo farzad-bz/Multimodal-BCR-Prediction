@@ -28,14 +28,36 @@ def main(cfg):
         ld_tr, ld_va, (T_va, E_va) = make_loaders(cfg, modalities, clinical_df, MRIs, fold)
         best_model, c_index = train_one_fold(cfg, get_image_encoder(cfg, device), modalities, ld_tr, ld_va, T_va, E_va, fold, logger=logger, wandb_logger=wandb_logger, device=device)
         fold_cidx.append(c_index)
-        torch.save(best_model, os.path.join(cfg.exp.experiment_dir, "SurvivalModelMM_best.pth"))
+        torch.save(best_model.state_dict(), os.path.join(cfg.exp.experiment_dir, f"SurvivalModelMM_fold{fold}_best.pt"))
         if wandb_logger:
             wandb_logger.summary[f"C-index for fold {fold}"] = c_index
             wandb_logger.finish()
 
+    exp = {'name': [cfg.exp.name],
+        'ImageEncoder':  [cfg.image_encoder.type],
+        'modalities':  ['+'.join(cfg.data.modalities)],
+        'Augmentation':  [cfg.data.aug],
+        'fold_0 C-index':  [float(f'{fold_cidx[0]:.4f}')],
+        'fold_1 C-index':  [float(f'{fold_cidx[1]:.4f}')],
+        'fold_2 C-index':  [float(f'{fold_cidx[2]:.4f}')],
+        'fold_3 C-index':  [float(f'{fold_cidx[3]:.4f}')],
+        'fold_4 C-index':  [float(f'{fold_cidx[4]:.4f}')],
+        'Mean C-index':  [float(f'{np.mean(fold_cidx):.4f}')],
+        'StDev C-index':  [float(f'{np.std(fold_cidx):.4f}')]}
+    
+    if os.path.exists('results.csv'):
+        results_df = pd.read_csv('results.csv', index_col=0)
+        results_df = pd.concat([results_df, pd.DataFrame(exp)], ignore_index=True)
+    else:
+        results_df = pd.DataFrame(exp)
+    results_df.to_csv('results.csv')
+    
     print(f"DeepSurv - CV C-index: mean:{np.mean(fold_cidx):.4f}, std:{np.std(fold_cidx)}")
     print("C-index for different folds:", fold_cidx)
     print("===END===")
+
+
+
 
 
 

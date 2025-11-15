@@ -325,9 +325,7 @@ def crop_or_pad_to_size(image, target_size=(32, 256, 256), pad_value=0):
     return padded
 
 
-def preprocess_MRI(args, clinical_df):
-    target_size = (32, 256, 256)
-    spacing = (0.3, 0.3, 3.0)
+def preprocess_MRI(args, clinical_df, target_size = (32, 256, 256), spacing = (0.3, 0.3, 3.0), folder_name=''):
     out_dir = args.out_dir
 
     for patient_id in tqdm(clinical_df['patient_id'].tolist()):
@@ -376,10 +374,10 @@ def preprocess_MRI(args, clinical_df):
         adc_arr = np.clip(adc_arr/adc_arr.max(), 0, 1)
         hbv_arr = np.clip(hbv_arr/hbv_arr.max(), 0, 1)
 
-        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_t2.npy', t2_arr)
-        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_adc.npy', adc_arr)
-        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_hbv.npy', hbv_arr)
-        np.save(f'{out_dir}/preprcoessed_mpMRI/{patient_id}_mask.npy', mask_arr)
+        np.save(f'{out_dir}/{folder_name}/{patient_id}_t2.npy', t2_arr)
+        np.save(f'{out_dir}/{folder_name}/{patient_id}_adc.npy', adc_arr)
+        np.save(f'{out_dir}/{folder_name}/{patient_id}_hbv.npy', hbv_arr)
+        np.save(f'{out_dir}/{folder_name}/{patient_id}_mask.npy', mask_arr)
     print(f'Preprocessed data saved in {out_dir}')
     
     
@@ -419,7 +417,9 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    os.makedirs(f'{args.out_dir}/preprcoessed_mpMRI/', exist_ok=True)
+    os.makedirs(f'{args.out_dir}/preprocessed_mpMRI_MedicalNet/', exist_ok=True)
+    os.makedirs(f'{args.out_dir}/preprocessed_mpMRI_M3D-CLIP/', exist_ok=True)
     clinical_df = prepare_datafrme(args)
-    preprocess_MRI(args, clinical_df)
+    preprocess_MRI(args, clinical_df, target_size=(32, 256, 256), spacing=(0.3, 0.3, 3.0), folder_name='preprocessed_mpMRI_M3D-CLIP')
+    preprocess_MRI(args, clinical_df, target_size=(16, 128, 128), spacing=(0.6, 0.6, 3.0), folder_name='preprocessed_mpMRI_MedicalNet')
     

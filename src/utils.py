@@ -17,7 +17,7 @@ def create_logger_and_dirs(cfg, fold):
     wandb_logger = None
     if cfg.wandb_logging.enabled:
         cfg_dict = OmegaConf.to_container(cfg, resolve=True)
-        wandb_logger = wandb.init(project=cfg.wandb_logging.project,
+        wandb_logger = wandb.init(project=cfg.wandb_logging.project ,
                               config=cfg_dict,
                               name = cfg.wandb_logging.run_name + f'_fold{fold}',
                               mode=cfg.wandb_logging.mode)
