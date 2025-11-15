@@ -1,3 +1,27 @@
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+
+# Virtual environments
+.env
+.venv/
+.env/
+env/
+*.env
+
+
 data/preprcoessed_mpMRI/
 *.npy
 *.mha
+wandb/
+outputs/
+
+/__pycache__
+.pyc

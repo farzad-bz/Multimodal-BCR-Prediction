@@ -2,7 +2,7 @@
 # Experiment identity
 # =========================
 exp:
-  name: "default"
+  name: "Only clinical"
   output_dir: "./outputs/"     # will be created if missing
   seed: 42
 
@@ -14,7 +14,7 @@ data:
   clinical_df_path: "./data/clinical_data_processed.csv"
   modalities: #modalities to use for training the model
     - clinical
-    - t2
+    # - t2
     # - hbv
     # - adc
   features: #features to use from clinical_data
@@ -54,7 +54,7 @@ optim:
 train:
   epochs: 200
   stop_patience: 30
-  batch_size: 32                     # per GPU batch
+  batch_size: 32                     # batch size
   accum_steps: 1                      # effective batch = batch_size * accum_steps
 
 # =========================

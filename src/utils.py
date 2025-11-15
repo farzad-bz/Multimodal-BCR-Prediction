@@ -10,7 +10,7 @@ from omegaconf import OmegaConf
 
 
 
-def create_logger_and_dirs(cfg):
+def create_logger_and_dirs(cfg, fold):
     """
     Create a logger that writes to a log file, stdout and wandb logger.
     """
@@ -19,11 +19,11 @@ def create_logger_and_dirs(cfg):
         cfg_dict = OmegaConf.to_container(cfg, resolve=True)
         wandb_logger = wandb.init(project=cfg.wandb_logging.project,
                               config=cfg_dict,
-                              name = cfg.wandb_logging.run_name,
+                              name = cfg.wandb_logging.run_name + f'_fold{fold}',
                               mode=cfg.wandb_logging.mode)
-        cfg.wandb_logging = wandb.run.id
+        cfg.wandb_id = wandb.run.id
     
-    experiment_index = len(glob(f"{cfg.exp.output_dir}/{cfg.exp.name}/*"))
+    experiment_index = len(glob(f"{cfg.exp.output_dir}/{cfg.exp.name}_fold{fold}'/*"))
     cfg.exp.experiment_dir = os.path.join(cfg.exp.output_dir, cfg.exp.name, f'{experiment_index:03d}')
     os.makedirs(cfg.exp.experiment_dir, exist_ok=True)  # Make results folder (holds all experiment subfolders)
     

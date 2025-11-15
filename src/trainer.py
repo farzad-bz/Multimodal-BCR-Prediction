@@ -7,7 +7,7 @@ from lifelines.utils import concordance_index
 
 
 # ======= Train one fold =======
-def train_one_fold(cfg, M3D_model, modalities, ld_tr, ld_va, T_va_np, E_va_np, device):
+def train_one_fold(cfg, M3D_model, modalities, ld_tr, ld_va, T_va_np, E_va_np, fold, logger, wandb_logger=None, device='cpu'):
     model = SurvivalModelMM(modalities=modalities, d_emb=cfg.fusion_model.embed_dim).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.optim.lr, weight_decay=cfg.optim.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='max', factor=cfg.optim.scheduler_factor, patience=cfg.optim.scheduler_patience, verbose=False)
@@ -94,7 +94,7 @@ def train_one_fold(cfg, M3D_model, modalities, ld_tr, ld_va, T_va_np, E_va_np, d
         c_idx = concordance_index(T_va_np, -risk_va, E_va_np)
         scheduler.step(c_idx)
         # if epoch % 10 == 0 or epoch == 1:
-        print(f"Epoch {epoch}: Train loss={running/len(ld_tr):.4f}, Val C-index={c_idx:.4f}")
+        logger.info(f"Epoch {epoch}: Train loss={running/len(ld_tr):.4f}, Val C-index={c_idx:.4f}")
         # early stopping
         if c_idx > best_c + 1e-4:
             best_c = c_idx
@@ -104,8 +104,14 @@ def train_one_fold(cfg, M3D_model, modalities, ld_tr, ld_va, T_va_np, E_va_np, d
             bad += 1
             if bad >= cfg.train.stop_patience:
                 break
+            
+        if wandb_logger:
+            lrs = [param_group['lr'] for param_group in opt.param_groups]
+            wandb_logger.log({f'fold_{fold} learning_rate': sum(lrs) / len(lrs)},  step=epoch)
+            wandb_logger.log({f'fold_{fold} Train Loss': running/len(ld_tr)},  step=epoch)
+            wandb_logger.log({f'fold_{fold} Val C-index': c_idx},  step=epoch)
 
     # restore best
     if best_state is not None:
         model.load_state_dict({k: v for k, v in best_state.items()})
-    return best_c
+    return model, best_c
