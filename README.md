@@ -1,37 +1,79 @@
-# Multimodal BCR Prediction
-This repository contains a compact pipeline for predicting biochemical recurrence (BCR) of prostate cancer by fusing pre-operative multi-parametric MRI (mpMRI) volumes with clinical covariates. The default experiment fine-tunes a lightweight survival head on top of frozen M3D-CLIP volumetric embeddings and evaluates performance with cross-validated concordance index (C-index).
+# 🧠 Multimodal BCR Prediction
+Use pre-operative multi-parametric MRI (mpMRI) together with clinical covariates to predict biochemical recurrence (BCR) in prostate cancer. The pipeline freezes an M3D-CLIP volumetric encoder, trains a lightweight survival head, and reports cross-validated concordance index (C-index) for reproducible benchmarking.
 
-## Repository layout
-- `configs/base.yaml` – central configuration for data paths, modalities, optimizer and logging options.
-- `data/` – expected location of the processed clinical spreadsheet, five-fold split definition and per-modality MRI tensors (`{patient_id}_{t2|hbv|adc}.npy`).
-- `src/data_utils.py` – dataset utilities that scale clinical features, build TorchIO augmentation pipelines and load NumPy MRI volumes into PyTorch `DataLoader`s.
-- `src/models.py` – modular fusion head (`SurvivalModelMM`) plus the helper that loads the frozen `GoodBaiBai88/M3D-CLIP` encoder.
-- `src/trainer.py` – survival-training loop with ranking loss, per-fold validation and early stopping based on C-index.
-- `train.py` – orchestrates data prep, cross-validated training and logging.
+---
 
-## Prerequisites
-Create an environment with Python 3.9+ and install the dependencies manually (the minimal set implied by the source code is `torch`, `torchvision`, `torchio`, `transformers`, `omegaconf`, `pandas`, `numpy`, `scikit-learn`, `lifelines`, and `wandb`). GPU acceleration is recommended for the M3D-CLIP encoder.
+## 🗂️ Repository Layout
+- `configs/base.yaml` – central configuration for data paths, modalities, optimization, and logging.
+- `data/` – processed clinical spreadsheet, five-fold split helpers, and `{patient_id}_{t2|hbv|adc}.npy` MRI tensors.
+- `src/data_utils.py` – TorchIO augmentations, modality loaders, and standardized `DataLoader` builders.
+- `src/models.py` – the modular fusion head (`SurvivalModelMM`) plus `get_image_encoder`.
+- `src/trainer.py` – ranking-loss training with per-fold validation, LR scheduling, and early stopping.
+- `train.py` – main entry point that wires data prep, training, and logging.
 
-## Data expectations
-1. `data/clinical_data_processed.csv` – rows indexed by subject, containing at least the six features listed in `configs/base.yaml` plus `fold`, `patient_id`, `time_to_follow-up/BCR`, and `BCR`.
-2. `data/data_split_5fold.csv` – optional helper for constructing the `fold` column.
-3. `data/preprcoessed_mpMRI/` – NumPy volumes saved per patient and modality as `{patient_id}_t2.npy`, `{patient_id}_hbv.npy`, `{patient_id}_adc.npy`. Add or remove modalities via `data.modalities`.
+---
 
-If you modify feature names or add modalities, keep the YAML lists in sync so that `prepare_data` can build the modality-to-dimension mapping correctly.
+## ⚙️ Environment Setup
+Create a Python 3.9+ environment and install dependencies (`torch`, `torchvision`, `torchio`, `transformers`, `omegaconf`, `pandas`, `numpy`, `scikit-learn`, `lifelines`, `wandb`, etc.). A CUDA-capable GPU speeds up M3D-CLIP embedding.
 
-## Running an experiment
+```bash
+# 🐍 Virtualenv
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# 🐚 Conda (optional)
+conda create -n multimodal-bcr python=3.9 -y
+conda activate multimodal-bcr
+pip install -r requirements.txt
+```
+
+---
+
+## 🧼 Data Preparation & Preprocessing
+1. **📄 Clinical spreadsheet**
+   - Ensure unique `patient_id` per row in the raw CSV.
+   - Create a `fold` column (from `data/data_split_5fold.csv` or your own split).
+   - Add survival labels `time_to_follow-up/BCR` and `BCR`.
+   - Engineer the six features listed in `configs/base.yaml` (including binary indicators for missing values) and save to `data/clinical_data_processed.csv`.
+
+2. **🧲 mpMRI volumes**
+   - Run your MRI preprocessing (bias-field correction, resample, crop, normalize, etc.) for each modality (`t2`, `hbv`, `adc`).
+   - Save tensors as `numpy.save(f"{patient_id}_{modality}.npy", tensor)` under `data/preprcoessed_mpMRI/` with shape `(D, H, W)` so TorchIO can add the channel dimension.
+
+3. **🛠️ Optional automation**
+   - Use `prepare_and_preparoces_data.py` or the `Multimodal-Quiz/MRI_preprocessing.ipynb` notebook to batch the steps above.
+   - Double-check that every `patient_id` appearing in the clinical CSV has all requested modality files before training.
+
+---
+
+## 📦 Data Expectations
+1. `data/clinical_data_processed.csv` – indexed by subject with the required features, `fold`, `patient_id`, `time_to_follow-up/BCR`, and `BCR`.
+2. `data/data_split_5fold.csv` – optional helper for constructing folds.
+3. `data/preprcoessed_mpMRI/` – `{patient_id}_{modality}.npy` tensors for each modality you plan to use.
+
+Keep `configs/base.yaml` synchronized with the actual feature names and modality availability.
+
+---
+
+## 🚀 Running an Experiment
 ```bash
 python train.py --config configs/base.yaml
 ```
-Key config knobs:
-- `data.modalities` toggles which inputs are fused (e.g., comment in hbv/adc to rely only on clinical + T2).
-- `fusion_model.embed_dim` controls the shared representation size for each modality before fusion.
-- `train.batch_size`, `train.epochs`, `train.stop_patience` adjust runtime and early stopping.
-- `wandb_logging.enabled` can be turned off for offline runs.
+Key knobs inside the config:
+- `data.modalities` – toggle which inputs are fused (e.g., enable `hbv`/`adc` to add MRI channels).
+- `fusion_model.embed_dim` – shared representation size per modality before fusion.
+- `train.batch_size`, `train.epochs`, `train.stop_patience` – runtime and early stopping behavior.
+- `wandb_logging.enabled` – set `false` for offline experiments.
 
-Each run creates `outputs/<exp.name>/<run_id>/` containing logs, the exact config snapshot and best model weights. Validation C-index per fold is printed to stdout for quick tracking.
+Each run writes `outputs/<exp.name>/<run_id>/` with logs, the exact config snapshot, model checkpoints, and metrics (C-index per fold printed to stdout).
 
-## Evaluation and extension
-- Extend `train.py` or implement `evaluate.py` for held-out testing by reusing `src/data_utils.make_loaders`.
-- To benchmark tabular-only baselines, populate `Classical_ML_models.py` with scikit-learn survival models and feed the standardized clinical features from `prepare_data.py`.
-- To try different medical encoders, replace `image_encoder.pretrained_path` with another Hugging Face repo that exposes `encode_image`.
+---
+
+## 🔍 Evaluation & Extension
+- Extend `train.py` or complete `evaluate.py` for held-out testing using `src/data_utils.make_loaders`.
+- Populate `Classical_ML_models.py` with scikit-learn baselines to compare against the multimodal model.
+- Swap `image_encoder.pretrained_path` if you want to experiment with other 3D medical encoders that expose `encode_image`.
+
+Happy experimenting! 🧪🚀
