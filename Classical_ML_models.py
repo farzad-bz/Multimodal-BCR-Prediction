@@ -26,7 +26,6 @@ def run_survival_cv_benchmark(
     feature_cols,
     time_col: str = "time_to_follow-up/BCR",
     event_col: str = "BCR",
-    n_splits: int = 5,
     random_state: int = 42,
 ):
     """
@@ -135,7 +134,7 @@ def run_survival_cv_benchmark(
                 min_samples_leaf=8,
                 max_features="sqrt",
                 n_jobs=-1,
-                random_state=0
+                random_state=random_state
             ))
         ])
         pipe.fit(X_tr, y_tr)
@@ -156,7 +155,7 @@ def run_survival_cv_benchmark(
                 learning_rate=0.05,
                 max_depth=3,
                 n_estimators=800,
-                random_state=0
+                random_state=random_state
             ))
         ])
         pipe.fit(X_tr, y_tr)
@@ -220,4 +219,4 @@ if __name__ == "__main__":
     cfg = OmegaConf.load(args.config)
     clinical_df = pd.read_csv(cfg.data.clinical_df_path, index_col=0)
 
-    res_df, summary = run_survival_cv_benchmark(clinical_df, cfg.data.features, time_col="time_to_follow-up/BCR", event_col="BCR", n_splits=5)
+    res_df, summary = run_survival_cv_benchmark(clinical_df, cfg.data.features, time_col="time_to_follow-up/BCR", event_col="BCR")
