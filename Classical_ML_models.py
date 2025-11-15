@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
-
+from omegaconf import OmegaConf
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -18,6 +18,7 @@ from sksurv.ensemble import RandomSurvivalForest, GradientBoostingSurvivalAnalys
 from sksurv.svm import FastSurvivalSVM
 
 from lifelines import CoxPHFitter
+import argpars
 
 
 def run_survival_cv_benchmark(
@@ -238,16 +239,16 @@ def run_survival_cv_benchmark(
     print(summary.round(3))
     return res_df, summary
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Predicting biochemical recurrence (BCR) using multimodal data")
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to YAML configuration file (e.g., configs/base.yaml)"
+    )
+    args = parser.parse_args()
+    cfg = OmegaConf.load(args.config)
+    clinical_df = pd.read_csv(cfg.data.clinical_df_path, index_col=0)
 
-clinical_df = pd.read_csv('./data/clinical_data_processed.csv', index_col=0)
-
-feature_cols = ['ISUP', 
-            'positive_lymph_nodes',
-            'lymphovascular_invasion',
-            'invasion_seminal_vesicles',
-            'positive_lymph_nodes_missing',
-            'age_at_prostatectomy'
-            ]
-
-
-res_df, summary = run_survival_cv_benchmark(clinical_df, feature_cols, time_col="time_to_follow-up/BCR", event_col="BCR", n_splits=5)
+    res_df, summary = run_survival_cv_benchmark(clinical_df, cfg.data.features, time_col="time_to_follow-up/BCR", event_col="BCR", n_splits=5)
