@@ -78,6 +78,23 @@ Repeat with different configs (clinical-only baseline, MedicalNet sweeps, M3D-CL
 ---
 
 ## 📈 Evaluation & Extensions
+
+The models are released as PyTorch checkpoints and hosted on [Hugging Face](https://huggingface.co/farzadbz/BCR_prediction_model) for easy reuse.
+
+---
+```python
+from huggingface_hub import hf_hub_download
+import torch
+from src.models import SurvivalModelMM
+
+# Download model
+model_path = hf_hub_download(repo_id="farzadbz/BCR_prediction_model", filename="your desired model path")
+ckpt = torch.load(model_path, map_location="cpu")
+model = SurvivalModelMM(modalities=modalities, d_emb=embed_dim).to(device)
+model.load_state_dict(ckpt)
+
+```
+
 - `evaluate.py` – load a saved checkpoint and reuse `src/data_utils.make_loaders` for held-out testing.
 - `Classical_ML_models.py` – implement CoxPH, Random Survival Forests, or other scikit-learn baselines on the clinical-only features.
 - `SurvivalModelMM` is modality-agnostic; add new inputs by declaring their dimensions in the `modalities` dict and providing embeddings during training/inference.
