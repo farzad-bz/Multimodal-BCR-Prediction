@@ -28,11 +28,12 @@ data:
   pin_memory: true
   aug: false
 
+fusion_model:
+  embed_dim: 16
+
 # =========================
 # 3D Medical encoder
 # =========================
-fusion_model:
-  embed_dim: 16
 
 image_encoder:
   pretrained_path: GoodBaiBai88/M3D-CLIP
