@@ -1,5 +1,6 @@
 #  Multimodal BCR Prediction
-Predict biochemical recurrence (BCR) in prostate cancer by fusing clinical covariates with pre-operative multi-parametric MRI (mpMRI). The pipeline freezes a volumetric encoder (M3D-CLIP or MedicalNet), feeds modality embeddings to a lightweight survival head, and reports five-fold cross-validated concordance (C-index). Training summaries are automatically appended to `results.csv` for easy leaderboard tracking.
+This project predicts biochemical recurrence (BCR) in prostate cancer by integrating pre-operative mpMRI (T2, ADC, HBV) with clinical covariates. Each MRI modality is encoded using a frozen 3D backbone (M3D-CLIP or MedicalNet), producing one embedding per sequence. These modality embeddings are concatenated with tabular clinical features and passed to a lightweight survival head trained using a pairwise ranking loss.
+Performance is evaluated using five-fold cross-validated C-index, following the official data split. All training runs automatically log metrics to W&B and append fold-level results to results.csv to simplify comparison and leaderboard tracking.
 
 ---
 
@@ -7,12 +8,13 @@ Predict biochemical recurrence (BCR) in prostate cancer by fusing clinical covar
 | Path | Purpose |
 | --- | --- |
 | `configs/*.yaml` | Ready-to-run configs spanning clinical-only baselines, MedicalNet, and M3D-CLIP modality mixes (LR sweeps, augmentation toggles, etc.). |
-| `prepare_and_preparoces_data.py` | Helper script that assembles the processed clinical CSV and `{patient_id}_{modality}.npy` volumes. |
+| `prepare_and_preparoces_data.py` | Builds the cleaned clinical dataframe (numeric conversion, missing-value handling, feature organization) from json files and generates masked prostate-gland MRI volumes for both MedicalNet and M3D-CLIP, saving all outputs into the `data` directory. |
 | `src/data_utils.py` | Loads clinical/MRI tensors, applies TorchIO augmentations, and builds PyTorch `DataLoader`s. |
 | `src/models.py` | Implements `SurvivalModelMM` plus helpers that download frozen volumetric encoders from the Hugging Face Hub. |
 | `src/trainer.py` | Pairwise-ranking training loop with LR scheduling, early stopping, and per-fold validation logging. |
 | `train.py` | Cross-validation driver: prepares data, trains each fold, writes checkpoints, and logs metrics to `results.csv`. |
-| `Classical_ML_models.py`, `evaluate.py` | Scaffolding for clinical-only baselines and held-out evaluation scripts. |
+| `Classical_ML_models.py` | Trains clinical-only survival baselines (CoxPH, Coxnet, RSF, GBSA) and reports their performance. |
+| `evaluate.py` | Loads a config, checkpoint, and fold to run held-out inference and compute metrics. |
 
 ---
 
@@ -30,6 +32,20 @@ pip install -r requirements.txt
 ---
 
 ## 🗂️ Data Requirements
+
+In the first step, use the following command to prepare the data required for training the multimodal survival model:
+
+```bash
+python prepare_and_preprocess_data.py \
+    --radiology-dir "PATH TO RADIOLOGY DATA" \
+    --clinical-dir "PATH TO CLINICAL DATA" \
+    --split-path "PATH TO DATA SPLIT" \
+    --out-dir "./data/"
+```
+
+This script will generate the following data:
+
+
 1. **Clinical spreadsheet — `data/clinical_data_processed.csv`**
    - Contains `patient_id`, `fold` (integers 0–4), `time_to_follow-up/BCR` (>0), `BCR` (0/1), plus the engineered features referenced in each config (default: `ISUP`, `positive_lymph_nodes`, `lymphovascular_invasion`, `invasion_seminal_vesicles`, `positive_lymph_nodes_missing`, `age_at_prostatectomy`).
    - You can reuse `data/data_split_5fold.csv` to populate the `fold` column or build your own splits; just ensure every fold index appears in the CSV.
